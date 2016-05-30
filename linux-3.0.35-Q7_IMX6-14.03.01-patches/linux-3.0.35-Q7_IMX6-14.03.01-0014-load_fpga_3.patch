@@ -1,0 +1,127 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-11 15:04:59.252048508 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01.bak3/linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-11 15:12:23.132053478 +0200
+@@ -238,6 +238,22 @@
+         return ret;
+ }
+ 
++
++/*
++ * PCIe
++ */
++static const struct imx_pcie_platform_data q7_imx6_pcie_data __initconst = {
++	.pcie_pwr_en	= -EINVAL,
++	.pcie_rst	= -EINVAL, //IMX_GPIO_NR(5,18),
++	.pcie_wake_up	= -EINVAL,
++	.pcie_dis	= -EINVAL,
++#ifdef CONFIG_IMX_PCIE_EP_MODE_IN_EP_RC_SYS
++       .type_ep        = 1,
++#else
++       .type_ep        = 0,
++#endif
++};
++
+ /**********************************************************************
+  *                         IO expanders
+  **********************************************************************/
+@@ -315,6 +331,9 @@
+ 
+ 	mp500_load_fpga();
+ 
++	/* HACK initialisation du PCIE a faire apres le reset du FPGA */
++	imx6q_add_pcie(&q7_imx6_pcie_data);
++
+ 	return 0;
+ }
+ 
+@@ -496,11 +515,11 @@
+ };
+ 
+ static struct i2c_board_info mxc_i2c3_board_info[] __initdata = {
+-        {
++    {
+ 		I2C_BOARD_INFO("pca9538", 0x71),
+ 		.platform_data = &pca9538_config_fpga_platdata,
+ 	},
+-        {
++    {
+ 		I2C_BOARD_INFO("pca9538", 0x73),
+ 		.platform_data = &pca9538_led_platdata,
+ 	},
+@@ -1112,7 +1131,7 @@
+ 		.bus_num = 0,
+ 		.chip_select = 0, /*CS0 on Q7 connector */
+ 		.platform_data = &mp500_spi_fpga_flash_data,
+-        },
++    },
+ };
+ 
+ static int q7_imx6_spi_q7_cs[] = {
+@@ -1398,20 +1417,6 @@
+ 
+ }
+ 
+-/*
+- * PCIe
+- */
+-static const struct imx_pcie_platform_data q7_imx6_pcie_data __initconst = {
+-	.pcie_pwr_en	= -EINVAL,
+-	.pcie_rst	= -EINVAL, //IMX_GPIO_NR(5,18),
+-	.pcie_wake_up	= -EINVAL,
+-	.pcie_dis	= -EINVAL,
+-#ifdef CONFIG_IMX_PCIE_EP_MODE_IN_EP_RC_SYS
+-       .type_ep        = 1,
+-#else
+-       .type_ep        = 0,
+-#endif
+-};
+ 
+ /*
+  * UART
+@@ -1830,12 +1835,7 @@
+ 	imx6q_add_mxc_pwm_backlight(0, &q7_imx6_pwm_lvds_backlight_data);
+ 	platform_device_register(&q7_imx6_pwm_beeper);
+ 
+-	/* Misc */
+-	imx6q_add_imx2_wdt(0, NULL);
+-	if(request_irq(Q7_IMX6_PLD_IRQ_WDTIG, q7_imx6_wdt_isr, 0, NULL, NULL))
+-		printk("Watchdog: can't claim irq %d\n", Q7_IMX6_PLD_IRQ_WDTIG);
+-	imx6q_add_pcie(&q7_imx6_pcie_data);
+-	imx6q_add_flexcan0(NULL);
++
+ 
+ 	/* HDMI Audio */
+ 	imx6q_add_hdmi_soc();
+@@ -1855,8 +1855,8 @@
+ 	platform_device_register(&mp500_gpio_led_platdev);
+ 
+ 	/* SPI */
+-	imx6q_add_ecspi(0, &q7_imx6_spi_q7_data);
+ 	imx6q_add_ecspi(2, &q7_imx6_spi_intern_data);
++	imx6q_add_ecspi(0, &q7_imx6_spi_q7_data);
+ 	spi_register_board_info(q7_imx6_spi_intern_board_info,
+ 				ARRAY_SIZE(q7_imx6_spi_intern_board_info));
+ 
+@@ -1870,8 +1870,14 @@
+ 	imx_add_viv_gpu(&imx6_gpu_data, &imx6q_gpu_pdata);
+ 	imx6q_add_vpu();
+ 
+-	/* Audio */
+ 
++	/* Misc */
++	imx6q_add_imx2_wdt(0, NULL);
++	if(request_irq(Q7_IMX6_PLD_IRQ_WDTIG, q7_imx6_wdt_isr, 0, NULL, NULL))
++		printk("Watchdog: can't claim irq %d\n", Q7_IMX6_PLD_IRQ_WDTIG);
++	imx6q_add_flexcan0(NULL);
++
++	/* Audio */
+ #ifdef CONFIG_SND_SOC_SGTL5000
+ 	imx6q_init_audio();
+ #else
+@@ -1889,7 +1895,6 @@
+ 	if (qseven_hw_revision() > 20) {
+ 		q7_imx6_set_uart3_boot_complete();
+ 	}
+-
+ }
+ 
+ extern void __iomem *twd_base;

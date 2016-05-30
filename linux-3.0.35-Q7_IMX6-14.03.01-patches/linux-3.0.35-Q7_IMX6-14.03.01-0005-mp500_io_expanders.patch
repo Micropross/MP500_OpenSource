@@ -1,0 +1,148 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-06-30 16:20:24.000000000 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 15:23:31.121164133 +0200
+@@ -104,6 +104,14 @@
+ #define Q7_IMX6_SD3_CD          IMX_GPIO_NR(5, 5)
+ #define Q7_IMX6_SD3_WP          IMX_GPIO_NR(5, 6)
+ 
++/* Micropross IO expanders */
++#define MX6Q_SECO_Q7_PCA9538_1_BASE_ADDR	IMX_GPIO_NR(8, 0)
++#define MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR	IMX_GPIO_NR(8, 8)
++#define MX6Q_SECO_Q7_PCA9538_3_BASE_ADDR	IMX_GPIO_NR(8, 16)
++
++#define MX6Q_SECO_Q7_IO_EXP_GPIO1(x)	(MX6Q_SECO_Q7_PCA9538_1_BASE_ADDR + (x))
++#define MX6Q_SECO_Q7_IO_EXP_GPIO2(x)	(MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR + (x))
++#define MX6Q_SECO_Q7_IO_EXP_GPIO3(x)	(MX6Q_SECO_Q7_PCA9538_3_BASE_ADDR + (x))
+ 
+ extern int q7_imx6_init_pfuze100(u32 int_gpio);
+ #ifndef CONFIG_SND_SOC_SGTL5000
+@@ -115,6 +123,92 @@
+ extern char *soc_reg_id;
+ extern char *pu_reg_id;
+ 
++/**********************************************************************
++ *                         IO expanders
++ **********************************************************************/
++
++static int pca9538_board_version_setup(struct i2c_client *client,
++	unsigned gpio_base, unsigned ngpio,
++	void *context)
++{
++	int pca9538_gpio_value[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
++
++	int n;
++
++	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
++		gpio_request(gpio_base + n, "PCA9538 BOARD VERSION GPIO Expander");
++		if (pca9538_gpio_value[n] < 0)
++			gpio_direction_input(gpio_base + n);
++		else
++			gpio_direction_output(gpio_base + n,
++						pca9538_gpio_value[n]);
++		gpio_export(gpio_base + n, 0);
++	}
++
++	return 0;
++}
++
++static struct pca953x_platform_data pca9538_board_version_platdata = {
++	.gpio_base	= MX6Q_SECO_Q7_PCA9538_1_BASE_ADDR,
++	.invert		= 0,
++	.setup		= pca9538_board_version_setup,
++};
++
++static int pca9538_config_fpga_setup(struct i2c_client *client,
++	unsigned gpio_base, unsigned ngpio,
++	void *context)
++{
++	int pca9538_gpio_value[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
++
++	int n;
++
++	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
++		gpio_request(gpio_base + n, "PCA9538 CONFIG FPGA GPIO Expander");
++		if (pca9538_gpio_value[n] < 0)
++			gpio_direction_input(gpio_base + n);
++		else
++			gpio_direction_output(gpio_base + n,
++						pca9538_gpio_value[n]);
++		gpio_export(gpio_base + n, 0);
++	}
++
++	return 0;
++}
++
++static struct pca953x_platform_data pca9538_config_fpga_platdata = {
++	.gpio_base	= MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR,
++	.invert		= 0,
++	.setup		= pca9538_config_fpga_setup,
++};
++
++
++static int pca9538_led_setup(struct i2c_client *client,
++	unsigned gpio_base, unsigned ngpio,
++	void *context)
++{
++	int pca9538_gpio_value[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
++
++	int n;
++
++	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
++		gpio_request(gpio_base + n, "PCA9538 LED GPIO Expander");
++		if (pca9538_gpio_value[n] < 0)
++			gpio_direction_input(gpio_base + n);
++		else
++			gpio_direction_output(gpio_base + n,
++						pca9538_gpio_value[n]);
++		gpio_export(gpio_base + n, 0);
++	}
++
++	return 0;
++}
++
++static struct pca953x_platform_data pca9538_led_platdata = {
++	.gpio_base	= MX6Q_SECO_Q7_PCA9538_3_BASE_ADDR,
++	.invert		= 0,
++	.setup		= pca9538_led_setup,
++};
++
+ void q7_imx6_suspend_enter(void)
+ {
+ 	void __iomem *pld_base;
+@@ -203,6 +297,10 @@
+ 		.flags = I2C_CLIENT_WAKE,
+ 		.irq = gpio_to_irq(IMX_GPIO_NR(1, 16)),
+ 	},
++	{
++		I2C_BOARD_INFO("pca9538", 0x70),
++		.platform_data = &pca9538_board_version_platdata,
++	},
+ #ifdef CONFIG_SND_SOC_SGTL5000
+ 	{
+ 		I2C_BOARD_INFO("sgtl5000", 0x0a),
+@@ -210,6 +308,17 @@
+ #endif
+ };
+ 
++static struct i2c_board_info mxc_i2c3_board_info[] __initdata = {
++        {
++		I2C_BOARD_INFO("pca9538", 0x71),
++		.platform_data = &pca9538_config_fpga_platdata,
++	},
++        {
++		I2C_BOARD_INFO("pca9538", 0x73),
++		.platform_data = &pca9538_led_platdata,
++	},
++};
++
+ static struct i2c_board_info mxc_i2c5_board_info[] __initdata = {
+ 	{
+ 		I2C_BOARD_INFO("mxc_hdmi_i2c", 0x50),
+@@ -1414,6 +1523,8 @@
+ 
+ 	i2c_register_board_info(2, mxc_smbus_board_info,
+ 				ARRAY_SIZE(mxc_smbus_board_info));
++	i2c_register_board_info(3, mxc_i2c3_board_info,
++				ARRAY_SIZE(mxc_i2c3_board_info));
+ 	i2c_register_board_info(6, mxc_i2c5_board_info,
+ 				ARRAY_SIZE(mxc_i2c5_board_info));
+ 	i2c_register_board_info(7, mxc_i2c6_board_info,

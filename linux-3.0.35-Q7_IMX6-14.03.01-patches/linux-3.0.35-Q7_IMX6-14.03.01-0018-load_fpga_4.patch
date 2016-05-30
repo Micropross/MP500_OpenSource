@@ -1,0 +1,11 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-11-24 14:16:59.108148633 +0100
++++ linux-3.0.35-Q7_IMX6-14.03.01-2/arch/arm/mach-mx6/board-q7_imx6.c	2014-11-24 13:53:50.358521789 +0100
+@@ -1133,7 +1133,7 @@ static struct spi_board_info q7_imx6_spi
+ 	},
+ 	{
+ 		.modalias = "m25p80",
+-		.max_speed_hz = 20000000, /* max spi clock (SCK) speed in HZ */
++		.max_speed_hz = 10000000, /* max spi clock (SCK) speed in HZ */
+ 		.bus_num = 0,
+ 		.chip_select = 0, /*CS0 on Q7 connector */
+ 		.platform_data = &mp500_spi_fpga_flash_data,

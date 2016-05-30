@@ -1,0 +1,11 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-21 17:04:18.140050516 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-21 17:06:44.216050063 +0200
+@@ -664,7 +664,7 @@
+ };
+ 
+ static struct platform_pwm_backlight_data q7_imx6_pwm_lvds_backlight_data = {
+-	.pwm_id		= 0,
++	.pwm_id		= 1,
+ 	.max_brightness	= 255,
+ 	.dft_brightness	= 192,
+ 	.pwm_period_ns	= 50000,

@@ -1,0 +1,191 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 15:26:45.653168264 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 15:30:04.705173029 +0200
+@@ -113,6 +113,11 @@
+ #define MX6Q_SECO_Q7_IO_EXP_GPIO2(x)	(MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR + (x))
+ #define MX6Q_SECO_Q7_IO_EXP_GPIO3(x)	(MX6Q_SECO_Q7_PCA9538_3_BASE_ADDR + (x))
+ 
++#define MP500_CONFIG_FPGA_IO_PRG	MX6Q_SECO_Q7_IO_EXP_GPIO2(0)
++#define MP500_CONFIG_FPGA_IO_INIT	MX6Q_SECO_Q7_IO_EXP_GPIO2(1)
++#define MP500_CONFIG_FPGA_IO_DONE	MX6Q_SECO_Q7_IO_EXP_GPIO2(2)
++#define MP500_CONFIG_FPGA_IO_BUF_OE	MX6Q_SECO_Q7_IO_EXP_GPIO2(3)
++
+ extern int q7_imx6_init_pfuze100(u32 int_gpio);
+ #ifndef CONFIG_SND_SOC_SGTL5000
+ static int imx_audmux_config(int slave, int master);
+@@ -123,6 +128,120 @@
+ extern char *soc_reg_id;
+ extern char *pu_reg_id;
+ 
++ /**********************************************************************
++ *                        Load FPGA
++ *********************************************************************/
++static int mp500_fpga_reset(unsigned long delay)
++{
++        u8 val = 0;
++        int i = 0;
++
++        /* FPGA asynchronous reset */
++
++        /* FPGA reset */
++	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_PRG, 0);
++
++        /* Wait for INIT goes low => chip reset */
++        for (i = 0; i < 10; i++) {
++		udelay(delay);
++                val = gpio_get_value_cansleep(MP500_CONFIG_FPGA_IO_INIT);
++		if(!val)
++			break;
++        }
++
++        if (val) {
++                printk(KERN_ERR "MP500 FPGA Chip did not reset !!!\n");
++                return -1;
++        } else {
++		printk(KERN_ERR "MP500 FPGA reset nb retry %d\n", i);
++	}
++
++	udelay(delay);
++	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 1);
++
++        /* Inactive reset */
++	udelay(delay);
++	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_PRG, 1);
++	
++	udelay(delay);
++        /* Wait for INIT goes high => FPGA is ready */
++        for (i = 0; i < 10; i++)
++        {
++		udelay(delay);
++                val = gpio_get_value_cansleep(MP500_CONFIG_FPGA_IO_INIT);
++		if(val)
++			break;
++       }
++
++        if (!val)
++        {
++                printk(KERN_ERR "Chip reset failed !!!\n");
++                return -1;
++        } else {
++		printk(KERN_ERR "MP500 FPGA reset 2 nb retry %d\n", i);
++	}
++        return 0;
++}
++
++static int mp500_load_fpga(void)
++{
++        u8 init = 0;
++        u8 done = 0;
++        int i = 0;
++	unsigned long delay = 10;
++	int ret = 0;
++
++       printk(KERN_ERR "MP500 Start loading fpga\n");
++	
++	/* Start data transfer */
++//	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 1);
++//	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_PRG, 1);
++
++
++        /* FPGA reset */
++	ret = mp500_fpga_reset(delay);
++        if (ret)
++        {
++                printk(KERN_ERR "Chip reset failed\n");
++                goto out;
++        }
++
++        for (i = 0; i < 15; i++)
++        {
++		udelay(delay);
++                init = gpio_get_value_cansleep(MP500_CONFIG_FPGA_IO_INIT);
++                done = gpio_get_value_cansleep(MP500_CONFIG_FPGA_IO_DONE);
++		if(init == 0 || done == 1)
++			break; 
++                mdelay(500);
++        }
++
++        /* Error occured if init pass to 0 during data loading */
++        if (init == 0 || done == 0)
++        {
++                printk(KERN_ERR "MP500 FPGA data loading failed loop %d init %u done %u\n", 
++			i, init, done);
++                ret = -1;
++		goto out;
++        }
++
++out:
++	if(ret) { 
++	        printk(KERN_ERR "MP500 FPGA data loading failed\n");
++		/* error */
++		gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_PRG, 1); /* FPGA reset active */
++		gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 0);
++		udelay(delay);
++	} else {
++		/* UC will be able to access to the SPI flash*/
++	        printk(KERN_ERR "MP500 FPGA loaded\n");
++		gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 0);
++		udelay(delay);
++	}
++
++        return ret;
++}
++
+ /**********************************************************************
+  *                         IO expanders
+  **********************************************************************/
+@@ -158,8 +277,7 @@
+ 	unsigned gpio_base, unsigned ngpio,
+ 	void *context)
+ {
+-	int pca9538_gpio_value[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+-
++	int pca9538_gpio_value[] = { -1, -1, -1, 0, -1, -1, -1, -1 };
+ 	int n;
+ 
+ 	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
+@@ -890,20 +1008,42 @@
+ };
+ 
+ static struct flash_platform_data q7_imx6_spi_nor_m25p32_data = {
+-	.name = "m25p32",
++	.name = "m25p80",
+ 	.parts = q7_imx6_spi_nor_partitions,
+ 	.nr_parts = ARRAY_SIZE(q7_imx6_spi_nor_partitions),
+-	.type = "sst25vf016b",
++	.type = "m25p32",
++};
++
++static struct mtd_partition mp500_spi_fpga_nor_partitions[] = {
++	{
++	 .name = "bitstream",
++	 .offset = 0,
++	 .size = MTDPART_SIZ_FULL,
++	},
++};
++
++static struct flash_platform_data mp500_spi_fpga_flash_data = {
++	.name = "m25p80",
++	.parts = mp500_spi_fpga_nor_partitions,
++	.nr_parts = ARRAY_SIZE(mp500_spi_fpga_nor_partitions),
++	.type = "n25q128a13",
+ };
+ 
+ static struct spi_board_info q7_imx6_spi_intern_board_info[] __initdata = {
+ 	{
+-		.modalias = "m25p32",
++		.modalias = "m25p80",
+ 		.max_speed_hz = 25000000, /* max spi clock (SCK) speed in HZ */
+ 		.bus_num = 2,
+ 		.chip_select = 0,
+ 		.platform_data = &q7_imx6_spi_nor_m25p32_data,
+ 	},
++	{
++		.modalias = "m25p80",
++		.max_speed_hz = 20000000, /* max spi clock (SCK) speed in HZ */
++		.bus_num = 0,
++		.chip_select = 0, /*CS0 on Q7 connector */
++		.platform_data = &mp500_spi_fpga_flash_data,
++        },
+ };
+ 
+ static int q7_imx6_spi_q7_cs[] = {

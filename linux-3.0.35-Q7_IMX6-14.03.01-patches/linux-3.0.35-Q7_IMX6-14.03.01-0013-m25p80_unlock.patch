@@ -1,0 +1,127 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/drivers/mtd/devices/m25p80.c	2014-07-08 16:26:27.305248333 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/drivers/mtd/devices/m25p80.c	2014-07-08 16:26:50.681249544 +0200
+@@ -66,6 +66,8 @@
+ #define	SR_BP0			4	/* Block protect 0 */
+ #define	SR_BP1			8	/* Block protect 1 */
+ #define	SR_BP2			0x10	/* Block protect 2 */
++#define	SR_BP3			0x40	/* Block protect 3 */
++#define	SR_TB			0x20	/* Top/Bottom */
+ #define	SR_SRWD			0x80	/* SR write protect */
+ 
+ /* Define max times to check status register before we give up. */
+@@ -604,6 +606,102 @@
+ 	return ret;
+ }
+ 
++static int m25p80_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
++{
++        struct m25p *flash = mtd_to_m25p(mtd);
++        uint32_t offset = ofs;
++        uint8_t status_old, status_new;
++        int res = 0;
++
++        mutex_lock(&flash->lock);
++        /* Wait until finished previous command */
++        if (wait_till_ready(flash)) {
++                res = 1;
++                goto err;
++        }
++
++        status_old = read_sr(flash);
++
++        if (offset < flash->mtd.size-(flash->mtd.size/2))
++                status_new = status_old | SR_BP2 | SR_BP1 | SR_BP0;
++        else if (offset < flash->mtd.size-(flash->mtd.size/4))
++                status_new = (status_old & ~SR_BP0) | SR_BP2 | SR_BP1;
++        else if (offset < flash->mtd.size-(flash->mtd.size/8))
++                status_new = (status_old & ~SR_BP1) | SR_BP2 | SR_BP0;
++        else if (offset < flash->mtd.size-(flash->mtd.size/16))
++                status_new = (status_old & ~(SR_BP0|SR_BP1)) | SR_BP2;
++        else if (offset < flash->mtd.size-(flash->mtd.size/32))
++                status_new = (status_old & ~SR_BP2) | SR_BP1 | SR_BP0;
++        else if (offset < flash->mtd.size-(flash->mtd.size/64))
++                status_new = (status_old & ~(SR_BP2|SR_BP0)) | SR_BP1;
++        else
++                status_new = (status_old & ~(SR_BP2|SR_BP1)) | SR_BP0;
++
++	status_new &= ~(SR_BP3 | SR_SRWD | SR_TB);
++	status_old &= ~(SR_BP3 | SR_SRWD | SR_TB);
++
++        /* Only modify protection if it will not unlock other areas */
++        if ((status_new&(SR_BP2|SR_BP1|SR_BP0)) >=
++                                        (status_old&(SR_BP2|SR_BP1|SR_BP0))) {
++                write_enable(flash);
++                if (write_sr(flash, status_new) < 0) {
++                        res = 1;
++                        goto err;
++                }
++        }
++
++err:    mutex_unlock(&flash->lock);
++        return res;
++}
++
++static int m25p80_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
++{
++        struct m25p *flash = mtd_to_m25p(mtd);
++        uint32_t offset = ofs;
++        uint8_t status_old, status_new;
++        int res = 0;
++
++        mutex_lock(&flash->lock);
++        /* Wait until finished previous command */
++        if (wait_till_ready(flash)) {
++                res = 1;
++                goto err;
++        }
++
++        status_old = read_sr(flash);
++ 
++        if (offset+len > flash->mtd.size-(flash->mtd.size/64))
++                status_new = status_old & ~(SR_BP2|SR_BP1|SR_BP0);
++        else if (offset+len > flash->mtd.size-(flash->mtd.size/32))
++                status_new = (status_old & ~(SR_BP2|SR_BP1)) | SR_BP0;
++        else if (offset+len > flash->mtd.size-(flash->mtd.size/16))
++                status_new = (status_old & ~(SR_BP2|SR_BP0)) | SR_BP1;
++        else if (offset+len > flash->mtd.size-(flash->mtd.size/8))
++                status_new = (status_old & ~SR_BP2) | SR_BP1 | SR_BP0;
++        else if (offset+len > flash->mtd.size-(flash->mtd.size/4))
++                status_new = (status_old & ~(SR_BP0|SR_BP1)) | SR_BP2;
++        else if (offset+len > flash->mtd.size-(flash->mtd.size/2))
++                status_new = (status_old & ~SR_BP1) | SR_BP2 | SR_BP0;
++        else
++                status_new = (status_old & ~SR_BP0) | SR_BP2 | SR_BP1;
++
++	status_new &= ~(SR_BP3 | SR_SRWD | SR_TB);
++	status_old &= ~(SR_BP3 | SR_SRWD | SR_TB);
++
++        /* Only modify protection if it will not lock other areas */
++        if ((status_new&(SR_BP2|SR_BP1|SR_BP0)) <=
++                                        (status_old&(SR_BP2|SR_BP1|SR_BP0))) {
++                write_enable(flash);
++                if (write_sr(flash, status_new) < 0) {
++                        res = 1;
++                        goto err;
++                }
++        }
++
++err:    mutex_unlock(&flash->lock);
++        return res;
++}
++
+ /****************************************************************************/
+ 
+ /*
+@@ -914,6 +1012,12 @@
+ 	flash->mtd.size = info->sector_size * info->n_sectors;
+ 	flash->mtd.erase = m25p80_erase;
+ 	flash->mtd.read = m25p80_read;
++	
++        /* flash protection support for STmicro chips */
++        if (JEDEC_MFR(info->jedec_id) == CFI_MFR_ST) {
++                flash->mtd.lock = m25p80_lock;
++                flash->mtd.unlock = m25p80_unlock;
++        }
+ 
+ 	/* sst flash chips use AAI word program */
+ 	if (JEDEC_MFR(info->jedec_id) == CFI_MFR_SST)

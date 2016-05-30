@@ -1,0 +1,68 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:02:52.745217241 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:04:23.529219290 +0200
+@@ -315,7 +315,8 @@
+ 		else
+ 			gpio_direction_output(gpio_base + n,
+ 						pca9538_gpio_value[n]);
+-		gpio_export(gpio_base + n, 0);
++		gpio_free(gpio_base + n);
++//		gpio_export(gpio_base + n, 0);
+ 	}
+ 
+ 	return 0;
+@@ -327,6 +328,45 @@
+ 	.setup		= pca9538_led_setup,
+ };
+ 
++/***********************************************************************
++ *                                  LED                                *
++ ***********************************************************************/
++ static struct gpio_led mp500_gpio_led[] = {
++          {
++                  .name = "led0:green",
++                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(0),
++          }, {
++                  .name = "led0:red",
++                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(1),
++         }, {
++                 .name = "led0:blue",
++                 .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(2),
++         },
++          {
++                  .name = "led1:green",
++                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(4),
++          }, {
++                  .name = "led1:red",
++                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(5),
++         }, {
++                 .name = "led1:blue",
++                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(6),
++         },
++};
++ 
++static struct gpio_led_platform_data mp500_gpio_led_platdata = {
++        .leds = mp500_gpio_led,
++        .num_leds = ARRAY_SIZE(mp500_gpio_led),
++};
++ 
++static struct platform_device mp500_gpio_led_platdev = {
++         .name = "leds-gpio",
++         .id = -1,
++         .dev = {
++                 .platform_data = &mp500_gpio_led_platdata,
++         },
++};
++
+ void q7_imx6_suspend_enter(void)
+ {
+ 	void __iomem *pld_base;
+@@ -1781,6 +1821,9 @@
+ 	imx6q_add_sdhci_usdhc_imx(2, &q7_imx6_sd3_data);
+ 
+ 	//imx6q_add_imx_snvs_rtc();
++	
++	/* LEDS */
++	platform_device_register(&mp500_gpio_led_platdev);
+ 
+ 	/* SPI */
+ 	imx6q_add_ecspi(0, &q7_imx6_spi_q7_data);

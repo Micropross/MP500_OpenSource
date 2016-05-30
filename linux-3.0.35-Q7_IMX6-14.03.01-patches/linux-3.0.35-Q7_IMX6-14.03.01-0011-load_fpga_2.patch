@@ -1,0 +1,49 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:05:29.905220753 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:07:25.573223386 +0200
+@@ -152,12 +152,9 @@
+         if (val) {
+                 printk(KERN_ERR "MP500 FPGA Chip did not reset !!!\n");
+                 return -1;
+-        } else {
+-		printk(KERN_ERR "MP500 FPGA reset nb retry %d\n", i);
+-	}
++        }
+ 
+ 	udelay(delay);
+-	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 1);
+ 
+         /* Inactive reset */
+ 	udelay(delay);
+@@ -191,12 +188,10 @@
+ 	unsigned long delay = 10;
+ 	int ret = 0;
+ 
+-       printk(KERN_ERR "MP500 Start loading fpga\n");
++       printk(KERN_ERR "MP500 Start loading FPGA\n");
+ 	
+ 	/* Start data transfer */
+-//	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 1);
+-//	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_PRG, 1);
+-
++	gpio_set_value_cansleep(MP500_CONFIG_FPGA_IO_BUF_OE, 1);
+ 
+         /* FPGA reset */
+ 	ret = mp500_fpga_reset(delay);
+@@ -277,7 +272,7 @@
+ 	unsigned gpio_base, unsigned ngpio,
+ 	void *context)
+ {
+-	int pca9538_gpio_value[] = { -1, -1, -1, 0, -1, -1, -1, -1 };
++	int pca9538_gpio_value[] = { 0, -1, -1, 0, -1, -1, -1, -1 };
+ 	int n;
+ 
+ 	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
+@@ -290,6 +285,8 @@
+ 		gpio_export(gpio_base + n, 0);
+ 	}
+ 
++	mp500_load_fpga();
++
+ 	return 0;
+ }
+ 

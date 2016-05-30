@@ -1,0 +1,69 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:08:38.613225006 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-08 16:09:31.913226210 +0200
+@@ -108,6 +108,7 @@
+ #define MX6Q_SECO_Q7_PCA9538_1_BASE_ADDR	IMX_GPIO_NR(8, 0)
+ #define MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR	IMX_GPIO_NR(8, 8)
+ #define MX6Q_SECO_Q7_PCA9538_3_BASE_ADDR	IMX_GPIO_NR(8, 16)
++#define MX6Q_SECO_Q7_PCA9538_4_BASE_ADDR	IMX_GPIO_NR(8, 24)
+ 
+ #define MX6Q_SECO_Q7_IO_EXP_GPIO1(x)	(MX6Q_SECO_Q7_PCA9538_1_BASE_ADDR + (x))
+ #define MX6Q_SECO_Q7_IO_EXP_GPIO2(x)	(MX6Q_SECO_Q7_PCA9538_2_BASE_ADDR + (x))
+@@ -268,6 +269,33 @@
+ 	.setup		= pca9538_board_version_setup,
+ };
+ 
++static int pca9538_daughterboard_version_setup(struct i2c_client *client,
++	unsigned gpio_base, unsigned ngpio,
++	void *context)
++{
++	int pca9538_gpio_value[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
++
++	int n;
++
++	 for (n = 0; n < ARRAY_SIZE(pca9538_gpio_value); ++n) {
++		gpio_request(gpio_base + n, "PCA9538 DAUGHTER BOARD VERSION GPIO Expander");
++		if (pca9538_gpio_value[n] < 0)
++			gpio_direction_input(gpio_base + n);
++		else
++			gpio_direction_output(gpio_base + n,
++						pca9538_gpio_value[n]);
++		gpio_export(gpio_base + n, 0);
++	}
++
++	return 0;
++}
++
++static struct pca953x_platform_data pca9538_daughterboard_version_platdata = {
++	.gpio_base	= MX6Q_SECO_Q7_PCA9538_4_BASE_ADDR,
++	.invert		= 0,
++	.setup		= pca9538_daughterboard_version_setup,
++};
++
+ static int pca9538_config_fpga_setup(struct i2c_client *client,
+ 	unsigned gpio_base, unsigned ngpio,
+ 	void *context)
+@@ -443,11 +471,11 @@
+ 	.bitrate = 100000,
+ };
+ 
+-
+ static struct i2c_board_info mxc_smbus_board_info[] __initdata = {
+ 	{
+ 		I2C_BOARD_INFO("24c02",		0x50),
+-	}, {
++	}, 
++	{
+ 		I2C_BOARD_INFO("rv3029c2",	0x56),
+ 		.flags = I2C_CLIENT_WAKE,
+ 		.irq = gpio_to_irq(IMX_GPIO_NR(1, 16)),
+@@ -456,6 +484,10 @@
+ 		I2C_BOARD_INFO("pca9538", 0x70),
+ 		.platform_data = &pca9538_board_version_platdata,
+ 	},
++	{
++		I2C_BOARD_INFO("pca9538", 0x71),
++		.platform_data = &pca9538_daughterboard_version_platdata,
++	},
+ #ifdef CONFIG_SND_SOC_SGTL5000
+ 	{
+ 		I2C_BOARD_INFO("sgtl5000", 0x0a),

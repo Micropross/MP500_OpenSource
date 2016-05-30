@@ -1,0 +1,12 @@
+--- linux-3.0.35-imx-1.1.2.orig/drivers/usb/core/hub.c	2014-06-05 10:32:00.571959114 +0200
++++ linux-3.0.35-imx-1.1.2/drivers/usb/core/hub.c	2014-06-05 10:58:49.371943273 +0200
+@@ -160,7 +160,8 @@
+ static u8 usb_device_white_list[] = {
+ 	USB_CLASS_HID,
+ 	USB_CLASS_HUB,
+-	USB_CLASS_MASS_STORAGE
++	USB_CLASS_MASS_STORAGE,
++	USB_CLASS_VENDOR_SPEC
+ };
+ 
+ static inline int in_white_list(u8 interfaceclass)

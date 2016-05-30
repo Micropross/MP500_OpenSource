@@ -1,0 +1,141 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/drivers/usb/gadget/inode.c	2014-07-01 16:32:00.883985483 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/drivers/usb/gadget/inode.c	2014-07-01 16:57:27.239982158 +0200
+@@ -43,6 +43,8 @@
+ #include <linux/delay.h>
+ #include <linux/time.h>
+ 
++#include "usbstring.c"
++
+ /*
+  * The gadgetfs API maps each endpoint to a file descriptor so that you
+  * can use standard synchronous read/write calls for I/O.  There's some
+@@ -154,6 +156,15 @@
+ 	struct super_block		*sb;
+ 	struct dentry			*dentry;
+ 
++#ifdef GADGETFS_HACK_STRING
++       #define NB_STRINGS 16
++       #define MAX_STRING_SIZE 255
++
++       char strings[NB_STRINGS][MAX_STRING_SIZE + 1];
++       struct usb_string usb_strings [NB_STRINGS];
++       struct usb_gadget_strings stringtab;
++#endif
++
+ 	/* except this scratch i/o buffer for ep0 */
+ 	u8				rbuf [256];
+ };
+@@ -180,6 +191,23 @@
+ 	if (!dev)
+ 		return NULL;
+ 	dev->state = STATE_DEV_DISABLED;
++#ifdef GADGETFS_HACK_STRING
++       {
++               int i = 0;
++               memset(&dev->stringtab, 0, sizeof(dev->stringtab));
++               memset(dev->strings, '\0', sizeof(dev->strings));
++               
++               for(i = 0; i < NB_STRINGS; i++)
++               {
++                       dev->usb_strings[i].s = dev->strings[i];
++                       dev->usb_strings[i].id = i;
++               }
++
++               dev->stringtab.language  = 0x0409,              /* "en-us" */
++               dev->stringtab.strings = dev->usb_strings;
++
++       }
++#endif
+ 	atomic_set (&dev->count, 1);
+ 	spin_lock_init (&dev->lock);
+ 	INIT_LIST_HEAD (&dev->epfiles);
+@@ -1268,6 +1296,44 @@
+ 	return retval;
+ }
+ 
++static long ep0_ioctl(struct file *fd, unsigned code, unsigned long value)
++{
++       struct dev_data         *dev = fd->private_data;
++       int                     status;
++
++       spin_lock_irq (&dev->lock);
++       if (likely (dev->gadget->ep0 != NULL)) {
++               switch (code) {
++#ifdef GADGETFS_HACK_STRING
++               case GADGETFS_SET_STRING:
++               {
++                       struct gadgetfs_string string;
++
++                       status = copy_from_user (&string, (void __user *)value, 
++                               sizeof(struct gadgetfs_string));
++                       if (status) {
++                               status = -EFAULT;
++                       } else {
++                               if(string.id >= NB_STRINGS) {
++                                       status = -EINVAL;
++                               } else {
++                                       memcpy(dev->strings[string.id], 
++                                               string.s, sizeof(dev->strings[string.id]));
++                               }
++                       }
++
++                       break;
++               }       
++#endif
++               default:
++                       status = -ENOTTY;
++               }
++       } else
++               status = -ENODEV;
++       spin_unlock_irq (&dev->lock);
++       return status;
++}
++
+ static int
+ ep0_fasync (int f, struct file *fd, int on)
+ {
+@@ -1355,6 +1421,7 @@
+ 	.fasync =	ep0_fasync,
+ 	.poll =		ep0_poll,
+ 	.unlocked_ioctl =	dev_ioctl,
++	.unlocked_ioctl =       ep0_ioctl,
+ 	.release =	dev_release,
+ };
+ 
+@@ -1503,7 +1570,15 @@
+ 				value = min (w_length, (u16) value);
+ 			break;
+ 		case USB_DT_STRING:
+-			goto unrecognized;
++#ifdef GADGETFS_HACK_STRING
++                       value = usb_gadget_get_string(&dev->stringtab,
++                                       w_value & 0xff, req->buf);
++                       if (value >= 0)
++                               value = min(w_length, (u16) value);
++                         break;
++#else		
++        		goto unrecognized;
++#endif
+ 
+ 		default:		// all others are errors
+ 			break;
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/include/linux/usb/gadgetfs.h	2014-07-01 16:31:48.863985509 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/include/linux/usb/gadgetfs.h	2014-07-01 16:58:34.587982013 +0200
+@@ -85,4 +85,17 @@
+  */
+ #define	GADGETFS_CLEAR_HALT	_IO('g', 3)
+ 
++#define GADGETFS_HACK_STRING
++#ifdef GADGETFS_HACK_STRING
++
++struct gadgetfs_string 
++{
++       uint8_t                 id;
++       char                    s[256];
++};
++/* Set string only implemented by ep0
++ */
++#define        GADGETFS_SET_STRING     _IOW('g', 4, struct gadgetfs_string*)
++#endif
++
+ #endif /* __LINUX_USB_GADGETFS_H */

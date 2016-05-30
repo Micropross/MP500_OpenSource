@@ -1,0 +1,32 @@
+--- linux-3.0.35-Q7_IMX6-14.03.01.orig/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-24 15:35:23.751263677 +0200
++++ linux-3.0.35-Q7_IMX6-14.03.01/arch/arm/mach-mx6/board-q7_imx6.c	2014-07-24 16:24:52.787254472 +0200
+@@ -379,22 +379,28 @@
+           {
+                   .name = "led0:green",
+                   .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(0),
++                  .default_state = LEDS_GPIO_DEFSTATE_OFF,
+           }, {
+                   .name = "led0:red",
+                   .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(1),
++                  .default_state = LEDS_GPIO_DEFSTATE_OFF,
+          }, {
+                  .name = "led0:blue",
+                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(2),
++                 .default_state = LEDS_GPIO_DEFSTATE_OFF,
+          },
+           {
+                   .name = "led1:green",
+                   .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(4),
++                  .default_state = LEDS_GPIO_DEFSTATE_OFF,
+           }, {
+                   .name = "led1:red",
+                   .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(5),
++                  .default_state = LEDS_GPIO_DEFSTATE_ON,
+          }, {
+                  .name = "led1:blue",
+-                  .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(6),
++                 .gpio = MX6Q_SECO_Q7_IO_EXP_GPIO3(6),
++                 .default_state = LEDS_GPIO_DEFSTATE_OFF,
+          },
+ };
+  

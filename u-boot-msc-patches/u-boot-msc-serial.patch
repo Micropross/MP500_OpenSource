@@ -1,0 +1,46 @@
+diff -aurN u-boot_mfg/board/msc/q7_imx6/q7_imx6.c u-boot_mfg_serial/board/msc/q7_imx6/q7_imx6.c
+--- u-boot_mfg/board/msc/q7_imx6/q7_imx6.c	2014-07-23 09:38:18.011597874 +0200
++++ u-boot_mfg_serial/board/msc/q7_imx6/q7_imx6.c	2014-07-23 11:26:15.631577797 +0200
+@@ -224,8 +224,30 @@
+ 
+ u32 get_board_rev(void)
+ {
+-	return 0x63000 ;
++	u32 cpurev = get_cpu_rev();
++	u32 type = ((cpurev >> 12) & 0xff);
++	if (type == MXC_CPU_MX6SOLO)
++		cpurev = (MXC_CPU_MX6DL) << 12 | (get_cpu_rev() & 0xFFF);
++
++	return cpurev;
++}
++
++#ifdef CONFIG_SERIAL_TAG
++u32 get_board_serial(struct tag_serialnr *serialnr)
++{
++	const char * sserial;
++	char slow_serial[8+1];
++	char shigh_serial[2+1];;
++
++	/* serial number length = 10 char  */
++	sserial = get_serial_number();
++	strncpy(shigh_serial, &sserial[0], 2);
++	strncpy(slow_serial, &sserial[2], 8);
++	
++	serialnr->low = simple_strtoul(slow_serial, NULL, 16);
++	serialnr->high = simple_strtoul(shigh_serial, NULL, 16);
+ }
++#endif
+ 
+ #ifdef CONFIG_MXC_SPI
+ void setup_spi(void)
+diff -aurN u-boot_mfg/include/configs/q7_imx6.h u-boot_mfg_serial/include/configs/q7_imx6.h
+--- u-boot_mfg/include/configs/q7_imx6.h	2014-07-23 09:52:45.303595187 +0200
++++ u-boot_mfg_serial/include/configs/q7_imx6.h	2014-07-23 11:25:19.727577971 +0200
+@@ -54,6 +54,7 @@
+ #include <asm/imx-common/gpio.h>
+ 
+ #define CONFIG_REVISION_TAG
++#define CONFIG_SERIAL_TAG
+ 
+ #define CONFIG_BOARD_EARLY_INIT_F
+ #define CONFIG_BOARD_POSTCLK_INIT
