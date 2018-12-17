@@ -19,6 +19,7 @@ Open source components used in MP500 firmware.
 - zlib (version 1.2.7)
 - linux (version 3.0.35-Q7_IMX6-14.03.01 - including patches)
 - u-boot (version 2013.07-Q7_IMX6-14.03.01 - including patches)
+- lmfit (version 8.0)
 
 #### Toolchain
 - linaro-1.13.1-4.7-2013.01-20130125
